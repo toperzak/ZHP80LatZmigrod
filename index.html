@@ -106,7 +106,7 @@
             .catch(error => console.error('Error!', error.message));
         });
 
-               // Funkcja do filtrowania tabeli
+// Funkcja do filtrowania tabeli
         function filterTable() {
             const filterPseudonim = document.getElementById("search-pseudonim").value.toUpperCase();
             const filterRok = document.getElementById("search-rok").value;
@@ -115,59 +115,63 @@
             const rows = tableBody.getElementsByTagName("tr");
 
             for (let i = 0; i < rows.length; i++) {
-                let tdPseudonim = rows[i].getElementsByTagName("td")[0];
-                let tdRok = rows[i].getElementsByTagName("td")[1];
-                let tdDruzyna = rows[i].getElementsByTagName("td")[2];
-                let tdZastep = rows[i].getElementsByTagName("td")[3];
+                const row = rows[i];
+                const tdPseudonim = row.getElementsByTagName("td")[0];
+                const tdRok = row.getElementsByTagName("td")[1];
+                const tdDruzyna = row.getElementsByTagName("td")[2];
+                const tdZastep = row.getElementsByTagName("td")[3];
 
                 if (tdPseudonim && tdRok && tdDruzyna && tdZastep) {
                     const txtValuePseudonim = tdPseudonim.textContent || tdPseudonim.innerText;
                     const txtValueRok = tdRok.textContent || tdRok.innerText;
                     const txtValueDruzyna = tdDruzyna.textContent || tdDruzyna.innerText;
                     const txtValueZastep = tdZastep.textContent || tdZastep.innerText;
-
-                    // --- POCZĄTEK ZMIAN ---
                     
-                    // Logika sprawdzania roku
-                    let rokMatch = true; // Domyślnie zakładamy, że rok pasuje
-                    if (filterRok) { // Wykonaj sprawdzanie tylko, jeśli pole roku nie jest puste
+                    // --- NOWA, POPRAWIONA LOGIKA WYSZUKIWANIA ROKU ---
+                    
+                    let rokMatch = true; // Domyślnie true, wiersz jest pokazywany, chyba że filtr roku go wykluczy.
+                    
+                    if (filterRok) { // Sprawdzamy tylko, jeśli użytkownik coś wpisał w pole roku.
                         const searchYear = parseInt(filterRok, 10);
-                        const rangeParts = txtValueRok.split('-').map(year => parseInt(year.trim(), 10));
-                        
-                        // Sprawdzamy, czy mamy poprawny zakres lub pojedynczy rok
-                        if (!isNaN(searchYear)) {
-                            if (rangeParts.length === 2 && !isNaN(rangeParts[0]) && !isNaN(rangeParts[1])) {
-                                // Mamy zakres np. 1990-1995
-                                const startYear = rangeParts[0];
-                                const endYear = rangeParts[1];
+
+                        if (!isNaN(searchYear)) { // Sprawdzamy, czy wpisana wartość jest liczbą.
+                            
+                            // Używamy wyrażenia regularnego, by znaleźć wszystkie 4-cyfrowe liczby w tekście komórki.
+                            // To poradzi sobie z formatami "1990-1995", "ok. 1990 do 1995" itd.
+                            const yearsInCell = (txtValueRok.match(/\d{4}/g) || []).map(Number);
+                            
+                            if (yearsInCell.length === 1) {
+                                // Jeśli w komórce jest tylko jeden rok (np. "1998").
+                                rokMatch = (searchYear === yearsInCell[0]);
+                            } else if (yearsInCell.length >= 2) {
+                                // Jeśli są co najmniej dwa lata, bierzemy pierwszy jako początek i drugi jako koniec.
+                                const startYear = yearsInCell[0];
+                                const endYear = yearsInCell[1];
                                 rokMatch = (searchYear >= startYear && searchYear <= endYear);
-                            } else if (rangeParts.length === 1 && !isNaN(rangeParts[0])) {
-                                // Mamy pojedynczy rok np. 1998
-                                rokMatch = (searchYear === rangeParts[0]);
                             } else {
-                                // Jeśli format jest niepoprawny lub to nie jest liczba, używamy starej metody
-                                rokMatch = txtValueRok.indexOf(filterRok) > -1;
+                                // Jeśli w komórce nie ma żadnej 4-cyfrowej liczby.
+                                rokMatch = false;
                             }
                         } else {
-                           rokMatch = false; // Jeśli wpisana wartość nie jest liczbą
+                            // Jeśli użytkownik nie wpisał liczby (np. "lata 90-te"), szukamy jako zwykły tekst.
+                            rokMatch = txtValueRok.toUpperCase().indexOf(filterRok.toUpperCase()) > -1;
                         }
                     }
 
-                    // --- KONIEC ZMIAN ---
+                    // --- KONIEC NOWEJ LOGIKI ---
 
-                    // Sprawdzenie wszystkich filtrów
+                    // Sprawdzamy wszystkie warunki razem
                     if (txtValuePseudonim.toUpperCase().indexOf(filterPseudonim) > -1 &&
-                        rokMatch && // Używamy naszej nowej zmiennej
+                        rokMatch &&
                         txtValueDruzyna.toUpperCase().indexOf(filterDruzyna) > -1 &&
                         txtValueZastep.toUpperCase().indexOf(filterZastep) > -1) {
-                        rows[i].style.display = "";
+                        row.style.display = "";
                     } else {
-                        rows[i].style.display = "none";
+                        row.style.display = "none";
                     }
                 }
             }
         }
-
         // Załaduj dane przy pierwszym otwarciu strony
         document.addEventListener('DOMContentLoaded', loadData);
     </script>
@@ -175,3 +179,4 @@
 </body>
 
 </html>
+
