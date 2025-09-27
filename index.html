@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baza Harcerzy ZHP Żmigród</title>
+    <style>
+        /* Proste style dla lepszej czytelności */
+        body { font-family: sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #006400; }
+        form, #search-section { margin-bottom: 30px; }
+        label { display: block; margin-bottom: 5px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ddd; }
+        button { background: #006400; color: #fff; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #004d00; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #006400; color: white; }
+        #search-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Wyszukiwarka Harcerzy ZHP Żmigród</h1>
+        <p style="text-align: center;">Z okazji 80-lecia ZHP w Żmigrodzie, odnajdźmy się na nowo!</p>
+
+        <div id="form-section">
+            <h2>Dodaj siebie do bazy</h2>
+            <form id="scout-form">
+                <label for="pseudonim">Pseudonim:</label>
+                <input type="text" id="pseudonim" name="pseudonim" required>
+
+                <label for="lata-sluzby">Lata służby (np. 1990-1995):</label>
+                <input type="text" id="lata-sluzby" name="lata-sluzby" required>
+
+                <label for="druzyna">Nazwa drużyny:</label>
+                <input type="text" id="druzyna" name="druzyna" required>
+
+                <label for="zastep">Nazwa zastępu:</label>
+                <input type="text" id="zastep" name="zastep">
+
+                <button type="submit">Dodaj do bazy</button>
+            </form>
+        </div>
+
+        <div id="search-section">
+            <h2>Wyszukaj znajomych</h2>
+            <div id="search-inputs">
+                <input type="text" id="search-pseudonim" onkeyup="filterTable()" placeholder="Szukaj po pseudonimie...">
+                <input type="text" id="search-rok" onkeyup="filterTable()" placeholder="Szukaj po roku służby...">
+                <input type="text" id="search-druzyna" onkeyup="filterTable()" placeholder="Szukaj po drużynie...">
+                <input type="text" id="search-zastep" onkeyup="filterTable()" placeholder="Szukaj po zastępie...">
+            </div>
+        </div>
+
+        <table id="scouts-table">
+            <thead>
+                <tr>
+                    <th>Pseudonim</th>
+                    <th>Lata służby</th>
+                    <th>Drużyna</th>
+                    <th>Zastęp</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        const sheetURL = 'https://script.google.com/macros/s/AKfycbxjRjmwwFJMG39Ri73NMf4gYLcbG03YT9m7wey2DIo0fuMz4KuXqtJ0IDo9j2Zy6aq0/exec'; // WAŻNE: Zastąp ten link adresem URL swojej aplikacji webowej z Google Apps Script
+
+        const form = document.getElementById('scout-form');
+        const tableBody = document.querySelector("#scouts-table tbody");
+
+        // Funkcja do ładowania danych z Arkusza Google
+        function loadData() {
+            fetch(sheetURL)
+                .then(response => response.json())
+                .then(data => {
+                    tableBody.innerHTML = '';
+                    data.forEach(row => {
+                        const newRow = tableBody.insertRow();
+                        newRow.insertCell().textContent = row.pseudonim;
+                        newRow.insertCell().textContent = row.lataSluzby;
+                        newRow.insertCell().textContent = row.druzyna;
+                        newRow.insertCell().textContent = row.zastep;
+                    });
+                });
+        }
+
+        // Obsługa wysyłania formularza
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            fetch(sheetURL, {
+                method: 'POST',
+                body: new FormData(form),
+            })
+            .then(response => {
+                alert('Dodano do bazy!');
+                form.reset();
+                loadData();
+            })
+            .catch(error => console.error('Error!', error.message));
+        });
+
+        // Funkcja do filtrowania tabeli
+        function filterTable() {
+            const filterPseudonim = document.getElementById("search-pseudonim").value.toUpperCase();
+            const filterRok = document.getElementById("search-rok").value.toUpperCase();
+            const filterDruzyna = document.getElementById("search-druzyna").value.toUpperCase();
+            const filterZastep = document.getElementById("search-zastep").value.toUpperCase();
+            const rows = tableBody.getElementsByTagName("tr");
+
+            for (let i = 0; i < rows.length; i++) {
+                let tdPseudonim = rows[i].getElementsByTagName("td")[0];
+                let tdRok = rows[i].getElementsByTagName("td")[1];
+                let tdDruzyna = rows[i].getElementsByTagName("td")[2];
+                let tdZastep = rows[i].getElementsByTagName("td")[3];
+                if (tdPseudonim && tdRok && tdDruzyna && tdZastep) {
+                    let txtValuePseudonim = tdPseudonim.textContent || tdPseudonim.innerText;
+                    let txtValueRok = tdRok.textContent || tdRok.innerText;
+                    let txtValueDruzyna = tdDruzyna.textContent || tdDruzyna.innerText;
+                    let txtValueZastep = tdZastep.textContent || tdZastep.innerText;
+                    
+                    if (txtValuePseudonim.toUpperCase().indexOf(filterPseudonim) > -1 &&
+                        txtValueRok.toUpperCase().indexOf(filterRok) > -1 &&
+                        txtValueDruzyna.toUpperCase().indexOf(filterDruzyna) > -1 &&
+                        txtValueZastep.toUpperCase().indexOf(filterZastep) > -1) {
+                        rows[i].style.display = "";
+                    } else {
+                        rows[i].style.display = "none";
+                    }
+                }
+            }
+        }
+
+        // Załaduj dane przy pierwszym otwarciu strony
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+
+</body>
+</html>
