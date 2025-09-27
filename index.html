@@ -76,18 +76,21 @@
     </div>
 
     <script>
-        const sheetURL = 'https://script.google.com/macros/s/AKfycbxjRjmwwFJMG39Ri73NMf4gYLcbG03YT9m7wey2DIo0fuMz4KuXqtJ0IDo9j2Zy6aq0/exec'; // WAŻNE: Zastąp ten link adresem URL swojej aplikacji webowej z Google Apps Script
-
+        const sheetURL = 'https://script.google.com/macros/s/AKfycbxjRjmwwFJMG39Ri73NMf4gYLcbG03YT9m7wey2DIo0fuMz4KuXqtJ0IDo9j2Zy6aq0/exec';
         const form = document.getElementById('scout-form');
         const tableBody = document.querySelector("#scouts-table tbody");
         const table = document.getElementById("scouts-table");
 
-        // Funkcja do ładowania danych z Arkusza Google
         function loadData() {
             fetch(sheetURL)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Błąd sieci lub niepoprawny adres URL.');
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    tableBody.innerHTML = ''; // Czyścimy tabelę przed załadowaniem nowych danych
+                    tableBody.innerHTML = '';
                     data.forEach(row => {
                         const newRow = tableBody.insertRow();
                         newRow.insertCell().textContent = row.pseudonim;
@@ -95,88 +98,90 @@
                         newRow.insertCell().textContent = row.druzyna;
                         newRow.insertCell().textContent = row.zastep;
                     });
+                })
+                .catch(error => {
+                    console.error('Błąd podczas ładowania danych z Google Sheets:', error);
+                    alert('Nie udało się załadować danych z bazy. Sprawdź, czy adres URL jest poprawny i czy skrypt jest prawidłowo wdrożony. Więcej informacji w konsoli (F12).');
                 });
         }
 
-        // Obsługa wysyłania formularza
         form.addEventListener('submit', e => {
             e.preventDefault();
-            fetch(sheetURL, {
-                method: 'POST',
-                body: new FormData(form),
-            })
-            .then(response => {
-                alert('Dodano do bazy! Nowe dane będą widoczne po chwili.');
-                form.reset();
-                setTimeout(loadData, 2000); // Dajemy arkuszowi chwilę na przetworzenie danych przed odświeżeniem
-            })
-            .catch(error => console.error('Error!', error.message));
+            fetch(sheetURL, { method: 'POST', body: new FormData(form) })
+                .then(response => {
+                    alert('Dodano do bazy! Nowe dane będą widoczne po chwili.');
+                    form.reset();
+                    setTimeout(loadData, 2000);
+                })
+                .catch(error => console.error('Błąd podczas wysyłania formularza:', error.message));
         });
 
-        // --- ZMIANA: Całkowicie nowa funkcja filtrująca ---
         function filterTable() {
             const filterPseudonim = document.getElementById("search-pseudonim").value.toUpperCase();
             const filterRok = document.getElementById("search-rok").value;
             const filterDruzyna = document.getElementById("search-druzyna").value.toUpperCase();
             const filterZastep = document.getElementById("search-zastep").value.toUpperCase();
             const rows = tableBody.getElementsByTagName("tr");
-
-            // Sprawdzamy, czy wszystkie pola wyszukiwania są puste
+            
+            // --- POPRAWIONA LOGIKA WIDOCZNOŚCI ---
             const isAnyFilterActive = filterPseudonim || filterRok || filterDruzyna || filterZastep;
 
             if (!isAnyFilterActive) {
-                table.style.display = "none"; // Jeśli nic nie wpisano, ukryj tabelę
-                return;
-            } else {
-                table.style.display = ""; // Jeśli cokolwiek wpisano, pokaż tabelę ( "" przywraca domyślny styl CSS)
-            }
+                table.style.display = "none"; // UKRYJ tabelę, jeśli wszystkie pola są puste
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].style.display = "none"; // Ukryj też wszystkie wiersze na wszelki wypadek
+                }
+                return; // Zakończ funkcję
+            } 
+            
+            // Jeśli jakikolwiek filtr jest aktywny, POKAŻ tabelę i filtruj wiersze
+            table.style.display = ""; 
 
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
-                const tdPseudonim = row.getElementsByTagName("td")[0];
-                const tdRok = row.getElementsByTagName("td")[1];
-                const tdDruzyna = row.getElementsByTagName("td")[2];
-                const tdZastep = row.getElementsByTagName("td")[3];
+                const [tdPseudonim, tdRok, tdDruzyna, tdZastep] = row.getElementsByTagName("td");
 
-                if (tdPseudonim && tdRok && tdDruzyna && tdZastep) {
-                    const txtValuePseudonim = tdPseudonim.textContent || tdPseudonim.innerText;
-                    const txtValueRok = tdRok.textContent || tdRok.innerText;
-                    const txtValueDruzyna = tdDruzyna.textContent || tdDruzyna.innerText;
-                    const txtValueZastep = tdZastep.textContent || tdZastep.innerText;
-                    
-                    let rokMatch = true;
-                    if (filterRok) {
-                        const searchYear = parseInt(filterRok, 10);
-                        if (!isNaN(searchYear)) {
-                            const yearsInCell = (txtValueRok.match(/\d{4}/g) || []).map(Number);
-                            if (yearsInCell.length === 1) {
-                                rokMatch = (searchYear === yearsInCell[0]);
-                            } else if (yearsInCell.length >= 2) {
-                                rokMatch = (searchYear >= yearsInCell[0] && searchYear <= yearsInCell[1]);
-                            } else {
-                                rokMatch = false;
-                            }
+                if (!tdPseudonim) continue; // Pomiń, jeśli wiersz jest pusty
+
+                const txtValuePseudonim = tdPseudonim.textContent || tdPseudonim.innerText;
+                const txtValueRok = tdRok.textContent || tdRok.innerText;
+                const txtValueDruzyna = tdDruzyna.textContent || tdDruzyna.innerText;
+                const txtValueZastep = tdZastep.textContent || tdZastep.innerText;
+                
+                // Sprawdzanie dopasowania roku
+                let rokMatch = true;
+                if (filterRok) {
+                    const searchYear = parseInt(filterRok, 10);
+                    if (!isNaN(searchYear)) {
+                        const yearsInCell = (txtValueRok.match(/\d{4}/g) || []).map(Number);
+                        if (yearsInCell.length === 1) {
+                            rokMatch = (searchYear === yearsInCell[0]);
+                        } else if (yearsInCell.length >= 2) {
+                            rokMatch = (searchYear >= yearsInCell[0] && searchYear <= yearsInCell[1]);
                         } else {
-                            rokMatch = txtValueRok.toUpperCase().indexOf(filterRok.toUpperCase()) > -1;
+                            rokMatch = false;
                         }
-                    }
-
-                    if (txtValuePseudonim.toUpperCase().indexOf(filterPseudonim) > -1 &&
-                        rokMatch &&
-                        txtValueDruzyna.toUpperCase().indexOf(filterDruzyna) > -1 &&
-                        txtValueZastep.toUpperCase().indexOf(filterZastep) > -1) {
-                        row.style.display = "";
                     } else {
-                        row.style.display = "none";
+                        rokMatch = txtValueRok.toUpperCase().indexOf(filterRok.toUpperCase()) > -1;
                     }
+                }
+                
+                // Ostateczne sprawdzenie wszystkich warunków
+                if (txtValuePseudonim.toUpperCase().indexOf(filterPseudonim) > -1 &&
+                    rokMatch &&
+                    txtValueDruzyna.toUpperCase().indexOf(filterDruzyna) > -1 &&
+                    txtValueZastep.toUpperCase().indexOf(filterZastep) > -1) {
+                    row.style.display = ""; // Pokaż wiersz, jeśli pasuje
+                } else {
+                    row.style.display = "none"; // Ukryj wiersz, jeśli nie pasuje
                 }
             }
         }
 
-        // Załaduj dane przy pierwszym otwarciu strony
         document.addEventListener('DOMContentLoaded', loadData);
     </script>
 
 </body>
 </html>
+
 
