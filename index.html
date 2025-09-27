@@ -11,13 +11,18 @@
         h1, h2 { text-align: center; color: #006400; }
         form, #search-section { margin-bottom: 30px; }
         label { display: block; margin-bottom: 5px; }
-        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ddd; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-bottom: 10px; border-radius: 4px; border: 1px solid #ddd; box-sizing: border-box; }
         button { background: #006400; color: #fff; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background: #004d00; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
         th { background-color: #006400; color: white; }
         #search-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        
+        /* --- ZMIANA: Domyślnie ukrywamy tabelę --- */
+        #scouts-table {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -47,6 +52,7 @@
 
         <div id="search-section">
             <h2>Wyszukaj znajomych</h2>
+            <p>Wpisz co najmniej jedną informację poniżej, aby rozpocząć wyszukiwanie.</p>
             <div id="search-inputs">
                 <input type="text" id="search-pseudonim" onkeyup="filterTable()" placeholder="Szukaj po pseudonimie...">
                 <input type="text" id="search-rok" onkeyup="filterTable()" placeholder="Szukaj po roku służby...">
@@ -70,17 +76,18 @@
     </div>
 
     <script>
-        const sheetURL = 'https://script.google.com/macros/s/AKfycbxjRjmwwFJMG39Ri73NMf4gYLcbG03YT9m7wey2DIo0fuMz4KuXqtJ0IDo9j2Zy6aq0/exec'; // WAŻNE: Zastąp ten link adresem URL swojej aplikacji webowej z Google Apps Script
+        const sheetURL = 'TUTAJ_WKLEJ_ADRES_URL_SWOJEGO_ARKUSZA_GOOGLE'; // WAŻNE: Zastąp ten link adresem URL swojej aplikacji webowej z Google Apps Script
 
         const form = document.getElementById('scout-form');
         const tableBody = document.querySelector("#scouts-table tbody");
+        const table = document.getElementById("scouts-table");
 
         // Funkcja do ładowania danych z Arkusza Google
         function loadData() {
             fetch(sheetURL)
                 .then(response => response.json())
                 .then(data => {
-                    tableBody.innerHTML = '';
+                    tableBody.innerHTML = ''; // Czyścimy tabelę przed załadowaniem nowych danych
                     data.forEach(row => {
                         const newRow = tableBody.insertRow();
                         newRow.insertCell().textContent = row.pseudonim;
@@ -99,20 +106,30 @@
                 body: new FormData(form),
             })
             .then(response => {
-                alert('Dodano do bazy!');
+                alert('Dodano do bazy! Nowe dane będą widoczne po chwili.');
                 form.reset();
-                loadData();
+                setTimeout(loadData, 2000); // Dajemy arkuszowi chwilę na przetworzenie danych przed odświeżeniem
             })
             .catch(error => console.error('Error!', error.message));
         });
 
-// Funkcja do filtrowania tabeli
+        // --- ZMIANA: Całkowicie nowa funkcja filtrująca ---
         function filterTable() {
             const filterPseudonim = document.getElementById("search-pseudonim").value.toUpperCase();
             const filterRok = document.getElementById("search-rok").value;
             const filterDruzyna = document.getElementById("search-druzyna").value.toUpperCase();
             const filterZastep = document.getElementById("search-zastep").value.toUpperCase();
             const rows = tableBody.getElementsByTagName("tr");
+
+            // Sprawdzamy, czy wszystkie pola wyszukiwania są puste
+            const isAnyFilterActive = filterPseudonim || filterRok || filterDruzyna || filterZastep;
+
+            if (!isAnyFilterActive) {
+                table.style.display = "none"; // Jeśli nic nie wpisano, ukryj tabelę
+                return;
+            } else {
+                table.style.display = ""; // Jeśli cokolwiek wpisano, pokaż tabelę ( "" przywraca domyślny styl CSS)
+            }
 
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
@@ -127,40 +144,23 @@
                     const txtValueDruzyna = tdDruzyna.textContent || tdDruzyna.innerText;
                     const txtValueZastep = tdZastep.textContent || tdZastep.innerText;
                     
-                    // --- NOWA, POPRAWIONA LOGIKA WYSZUKIWANIA ROKU ---
-                    
-                    let rokMatch = true; // Domyślnie true, wiersz jest pokazywany, chyba że filtr roku go wykluczy.
-                    
-                    if (filterRok) { // Sprawdzamy tylko, jeśli użytkownik coś wpisał w pole roku.
+                    let rokMatch = true;
+                    if (filterRok) {
                         const searchYear = parseInt(filterRok, 10);
-
-                        if (!isNaN(searchYear)) { // Sprawdzamy, czy wpisana wartość jest liczbą.
-                            
-                            // Używamy wyrażenia regularnego, by znaleźć wszystkie 4-cyfrowe liczby w tekście komórki.
-                            // To poradzi sobie z formatami "1990-1995", "ok. 1990 do 1995" itd.
+                        if (!isNaN(searchYear)) {
                             const yearsInCell = (txtValueRok.match(/\d{4}/g) || []).map(Number);
-                            
                             if (yearsInCell.length === 1) {
-                                // Jeśli w komórce jest tylko jeden rok (np. "1998").
                                 rokMatch = (searchYear === yearsInCell[0]);
                             } else if (yearsInCell.length >= 2) {
-                                // Jeśli są co najmniej dwa lata, bierzemy pierwszy jako początek i drugi jako koniec.
-                                const startYear = yearsInCell[0];
-                                const endYear = yearsInCell[1];
-                                rokMatch = (searchYear >= startYear && searchYear <= endYear);
+                                rokMatch = (searchYear >= yearsInCell[0] && searchYear <= yearsInCell[1]);
                             } else {
-                                // Jeśli w komórce nie ma żadnej 4-cyfrowej liczby.
                                 rokMatch = false;
                             }
                         } else {
-                            // Jeśli użytkownik nie wpisał liczby (np. "lata 90-te"), szukamy jako zwykły tekst.
                             rokMatch = txtValueRok.toUpperCase().indexOf(filterRok.toUpperCase()) > -1;
                         }
                     }
 
-                    // --- KONIEC NOWEJ LOGIKI ---
-
-                    // Sprawdzamy wszystkie warunki razem
                     if (txtValuePseudonim.toUpperCase().indexOf(filterPseudonim) > -1 &&
                         rokMatch &&
                         txtValueDruzyna.toUpperCase().indexOf(filterDruzyna) > -1 &&
@@ -172,11 +172,10 @@
                 }
             }
         }
+
         // Załaduj dane przy pierwszym otwarciu strony
         document.addEventListener('DOMContentLoaded', loadData);
     </script>
 
 </body>
-
 </html>
-
