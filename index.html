@@ -18,8 +18,9 @@
         th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
         th { background-color: #006400; color: white; }
         #search-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
-        /* Kluczowa reguła - tabela jest na starcie niewidoczna */
         .hidden { display: none; }
+        td a { color: #006400; text-decoration: none; font-weight: bold; }
+        td a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -39,6 +40,8 @@
                 <input type="text" id="druzyna" name="druzyna" required>
                 <label for="zastep">Nazwa zastępu:</label>
                 <input type="text" id="zastep" name="zastep">
+                <label for="profil-spolecznosciowy">Profil społecznościowy (opcjonalnie):</label>
+                <input type="text" id="profil-spolecznosciowy" name="profil-spolecznosciowy" placeholder="np. link do profilu na Facebooku">
                 <button type="submit">Dodaj do bazy</button>
             </form>
         </div>
@@ -61,6 +64,7 @@
                     <th>Lata służby</th>
                     <th>Drużyna</th>
                     <th>Zastęp</th>
+                    <th>Profil</th>
                 </tr>
             </thead>
             <tbody id="scouts-table-body">
@@ -70,7 +74,7 @@
     </div>
 
     <script>
-        const sheetURL = 'https://script.google.com/macros/s/AKfycbxjRjmwwFJMG39Ri73NMf4gYLcbG03YT9m7wey2DIo0fuMz4KuXqtJ0IDo9j2Zy6aq0/exec';
+        const sheetURL = 'https://script.google.com/macros/s/AKfycbxUOIxWl-oHp3PqqRH7efFNA5wB36ds2MgdCT5TckaPPNn7NwpvD8NJKTcYM8hsY03I/exec';
         
         const form = document.getElementById('scout-form');
         const table = document.getElementById('scouts-table');
@@ -84,16 +88,15 @@
             document.getElementById("search-zastep")
         ];
         
-        let allScoutsData = []; // Zmienna do przechowywania wszystkich danych w pamięci
+        let allScoutsData = [];
 
-        // --- 1. POBIERANIE DANYCH ---
         async function loadData() {
             try {
                 const response = await fetch(sheetURL);
                 if (!response.ok) throw new Error('Błąd sieci lub niepoprawny adres URL.');
                 
                 const data = await response.json();
-                allScoutsData = data; // Zapisujemy dane globalnie
+                allScoutsData = data;
                 console.log("Dane załadowane pomyślnie:", allScoutsData.length, "wpisów.");
             } catch (error) {
                 console.error('KRYTYCZNY BŁĄD podczas ładowania danych:', error);
@@ -101,7 +104,6 @@
             }
         }
         
-        // --- 2. LOGIKA FILTROWANIA I WYŚWIETLANIA ---
         function handleSearch() {
             const filters = {
                 pseudonim: searchInputs[0].value.toUpperCase(),
@@ -119,34 +121,25 @@
             }
 
             const filteredData = allScoutsData.filter(scout => {
-                // Filtr roku
                 let rokMatch = true;
                 if (filters.rok) {
                     const searchYear = parseInt(filters.rok, 10);
                     if (!isNaN(searchYear)) {
                         const yearsInCell = (scout.lataSluzby.match(/\d{4}/g) || []).map(Number);
-                        if (yearsInCell.length === 1) {
-                            rokMatch = (searchYear === yearsInCell[0]);
-                        } else if (yearsInCell.length >= 2) {
-                            rokMatch = (searchYear >= yearsInCell[0] && searchYear <= yearsInCell[1]);
-                        } else {
-                            rokMatch = false;
-                        }
-                    } else { // Wyszukiwanie tekstowe jeśli nie jest liczbą
+                        if (yearsInCell.length === 1) rokMatch = (searchYear === yearsInCell[0]);
+                        else if (yearsInCell.length >= 2) rokMatch = (searchYear >= yearsInCell[0] && searchYear <= yearsInCell[1]);
+                        else rokMatch = false;
+                    } else {
                         rokMatch = scout.lataSluzby.toUpperCase().includes(filters.rok.toUpperCase());
                     }
                 }
-
-                // Pozostałe filtry
                 const pseudonimMatch = scout.pseudonim.toUpperCase().includes(filters.pseudonim);
                 const druzynaMatch = scout.druzyna.toUpperCase().includes(filters.druzyna);
                 const zastepMatch = scout.zastep.toUpperCase().includes(filters.zastep);
-
                 return pseudonimMatch && rokMatch && druzynaMatch && zastepMatch;
             });
 
-            // Aktualizacja tabeli w DOM
-            tableBody.innerHTML = ''; // Czyścimy tabelę
+            tableBody.innerHTML = '';
 
             if (filteredData.length > 0) {
                 table.classList.remove('hidden');
@@ -157,6 +150,17 @@
                     row.insertCell().textContent = scout.lataSluzby;
                     row.insertCell().textContent = scout.druzyna;
                     row.insertCell().textContent = scout.zastep;
+
+                    // --- NOWA LOGIKA DODAWANIA LINKU ---
+                    const profileCell = row.insertCell();
+                    if (scout.profilSpolecznosciowy) {
+                        const link = document.createElement('a');
+                        link.href = scout.profilSpolecznosciowy;
+                        link.textContent = 'Zobacz profil';
+                        link.target = '_blank'; // Otwiera w nowej karcie
+                        link.rel = 'noopener noreferrer';
+                        profileCell.appendChild(link);
+                    }
                 });
             } else {
                 table.classList.add('hidden');
@@ -164,25 +168,20 @@
             }
         }
 
-        // --- 3. OBSŁUGA FORMULARZA ---
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
                 await fetch(sheetURL, { method: 'POST', body: new FormData(form) });
                 alert('Dodano do bazy! Nowe dane będą dostępne po chwili.');
                 form.reset();
-                setTimeout(loadData, 2000); // Odśwież dane w tle
+                setTimeout(loadData, 2000);
             } catch (error) {
                 console.error('Błąd podczas wysyłania formularza:', error);
                 alert('Wystąpił błąd podczas dodawania wpisu.');
             }
         });
 
-        // --- 4. START APLIKACJI ---
-        // Dodajemy nasłuchiwanie na zdarzenie 'input' do każdego pola wyszukiwania
         searchInputs.forEach(input => input.addEventListener('input', handleSearch));
-        
-        // Ładujemy dane przy starcie strony
         document.addEventListener('DOMContentLoaded', loadData);
     </script>
 </body>
